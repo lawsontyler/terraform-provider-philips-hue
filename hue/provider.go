@@ -24,10 +24,16 @@ func Provider() *schema.Provider {
 				Default: false,
 			},
 		},
+
 		ResourcesMap: map[string]*schema.Resource {
 			"hue_scene": resourceScene(),
 			"hue_group": resourceGroup(),
 		},
+
+		DataSourcesMap: map[string]*schema.Resource {
+			"hue_light": dataSourceHueLight(),
+		},
+
 		ConfigureFunc: providerConfigure,
 	}
 }
