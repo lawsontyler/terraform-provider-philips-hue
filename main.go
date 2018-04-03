@@ -3,7 +3,7 @@ package main
 import (
 	"github.com/hashicorp/terraform/plugin"
 	"github.com/hashicorp/terraform/terraform"
-	"github.com/lawson.tyler/terraform-provider-philips-hue/hue"
+	"github.com/lawsontyler/terraform-provider-philips-hue/hue"
 )
 
 func main() {
