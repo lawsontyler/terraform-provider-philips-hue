@@ -32,6 +32,7 @@ func Provider() *schema.Provider {
 
 		DataSourcesMap: map[string]*schema.Resource {
 			"hue_light": dataSourceHueLight(),
+			"hue_sensor": dataSourceHueSensor(),
 		},
 
 		ConfigureFunc: providerConfigure,
