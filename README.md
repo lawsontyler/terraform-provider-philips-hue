@@ -36,6 +36,75 @@ terraform init
 Pull requests are welcome!  I plan on only developing this as far as I need to for myself.  Please, extend it as you see
 fit and make some PRs back.
 
+## Usage
+
+Here's what some terrform might look like.  This is real code I'm using for my house.
+
+```
+provider "philips-hue" {
+    hub_address = "192.168.1.170"
+    hub_username = "totally-my-username"
+}
+
+data "philips-hue_light" "basement-1" {
+    light_id = "2"
+}
+
+data "philips-hue_light" "basement-2" {
+    light_id = "6"
+}
+
+data "philips-hue_sensor" "basement-dimmer" {
+    sensor_id = "8"
+}
+
+resource "philips-hue_scene" "basement-red" {
+    name = "Basement Red"
+
+    light_state {
+        light_id = "${data.philips-hue_light.basement-1.id}"
+        bri = "1"
+        sat = "255"
+        hue = "0"
+    }
+
+    light_state {
+        light_id = "${data.philips-hue_light.basement-2.id}"
+        bri = "1"
+        sat = "255"
+        hue = "0"
+    }
+}
+
+resource "philips-hue_group" "basement-group" {
+    name = "Basement Lamps"
+    lights = [ "${data.philips-hue_light.basement-1.id}", "${data.philips-hue_light.basement-2.id}" ]
+}
+
+resource "philips-hue_rule" "basement-dimmer-on-short" {
+    name = "Basement Dimmer On Short"
+
+    condition {
+        address = "/sensors/${data.philips-hue_sensor.basement-dimmer.id}/state/buttonevent"
+        operator = "eq"
+        value = "1000"
+    }
+
+    condition {
+        address = "/sensors/${data.philips-hue_sensor.basement-dimmer.id}/state/lastupdated"
+        operator = "dx"
+    }
+
+    action {
+        address = "/groups/${philips-hue_group.basement-group.id}/action"
+        method = "PUT"
+        body {
+            scene = "${philips-hue_scene.basement-red.id}"
+        }
+    }
+}
+```
+
 # SEIZURE WARNING
 
 In order to set and validate scenes, I need to actually set light states.  This means that the lights will change and flick from
