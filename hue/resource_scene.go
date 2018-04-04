@@ -2,8 +2,6 @@ package hue
 
 import (
 	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/lawsontyler/ghue/sdk/lights"
-	"fmt"
 	"github.com/lawsontyler/ghue/sdk/common"
 	"github.com/lawsontyler/ghue/sdk/scenes"
 	"github.com/lawsontyler/terraform-provider-philips-hue/hue/lib/constants"
@@ -85,49 +83,13 @@ func resourceSceneCreate(d *schema.ResourceData, m interface{}) error {
 
 	lightStates := d.Get("light_state").(*schema.Set).List()
 
-	var lightsInScene []string
-
-	for _, lightState := range lightStates {
-		lightState := lightState.(map[string]interface{})
-
-		stateValue := lights.SetStateValues{}
-
-		if brightness := lightState["bri"]; brightness != nil {
-			stateValue.Bri = brightness.(string)
-		}
-
-		if hue := lightState["hue"]; hue != nil {
-			stateValue.Hue = hue.(string)
-		}
-
-		if saturation := lightState["sat"]; saturation != nil {
-			stateValue.Sat = saturation.(string)
-		}
-
-		if xy := lightState["xy"].(*schema.Set); xy.Len() > 0 {
-			// The library expects two float64s as a string.  Neat.
-			stateValue.XY = fmt.Sprintf("%0.4fx%0.4f", xy.List()[0], xy.List()[1])
-		}
-
-		stateValue.TransitionTime = "0"
-
-		lightId := lightState["light_id"].(string)
-		lightsInScene = append(lightsInScene, lightId)
-
-		_, _, err := lights.SetState(connection, lightId , &stateValue)
-
-		if err != nil {
-			return err
-		}
-
-		d.SetPartial("light_state")
-	}
+	lightsInScene := getLightsInScene(lightStates)
 
 	// Now that we know the lights in the scene and have set their state, we can create the scene and capture it.
 
 	scene := scenes.Create{
-		Name: d.Get("name").(string),
-		Lights: lightsInScene,
+		Name:    d.Get("name").(string),
+		Lights:  lightsInScene,
 		Recycle: d.Get("recycle").(bool),
 	}
 
@@ -137,9 +99,71 @@ func resourceSceneCreate(d *schema.ResourceData, m interface{}) error {
 		return err
 	}
 
+	d.SetPartial("name")
+
+	// Now that it's created...and all the light states are wrong, let's run an update to set them.
+
+	err = setLightStates(connection, sceneResult.Success.Id, lightStates)
+
+	if err != nil {
+		return err
+	}
+
 	d.Partial(false)
 
 	d.SetId(sceneResult.Success.Id)
+
+	return nil
+}
+
+func getLightsInScene(lightStates []interface{}) []string {
+	var lightsInScene []string
+	for _, lightState := range lightStates {
+		lightState := lightState.(map[string]interface{})
+
+		lightId := lightState["light_id"].(string)
+		lightsInScene = append(lightsInScene, lightId)
+	}
+	return lightsInScene
+}
+
+func setLightStates(connection *common.Connection, sceneId string, lightStates []interface{}) error {
+	for _, lightState := range lightStates {
+		lightState := lightState.(map[string]interface{})
+		var updateLightState scenes.LightState
+
+		if brightness := lightState["bri"]; brightness != nil {
+			updateLightState.Bri = brightness.(string)
+		}
+
+		if hue := lightState["hue"]; hue != nil {
+			updateLightState.Hue = hue.(string)
+		}
+
+		if saturation := lightState["sat"]; saturation != nil {
+			updateLightState.Sat = saturation.(string)
+		}
+
+		if ct := lightState["ct"]; ct != nil {
+			updateLightState.CT = ct.(string)
+		}
+
+		if xy := lightState["xy"].(*schema.Set); xy.Len() > 1 {
+			updateLightState.XY = &[2]float64{ xy.List()[0].(float64), xy.List()[1].(float64) }
+		}
+
+		if transitiontime := lightState["transitiontime"]; transitiontime != nil {
+			updateLightState.TransitionTime = transitiontime.(int)
+		}
+
+		lightId := lightState["light_id"].(string)
+
+		_, _, err := scenes.UpdateSceneLightState(connection, sceneId, lightId , &updateLightState)
+
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
@@ -196,6 +220,29 @@ func resourceSceneRead(d *schema.ResourceData, m interface{}) error {
 }
 
 func resourceSceneUpdate(d *schema.ResourceData, m interface{}) error {
+	connection := m.(*common.Connection)
+
+	d.Partial(true)
+
+	lightStates := d.Get("light_state").(*schema.Set).List()
+	lightsInScene := getLightsInScene(lightStates)
+
+	// Now that we know the lights in the scene and have set their state, we can create the scene and capture it.
+
+	scene := scenes.Update{
+		Name:    d.Get("name").(string),
+		Lights:  lightsInScene,
+		Recycle: d.Get("recycle").(bool),
+	}
+
+	scenes.UpdateAPI(connection, d.Id(), &scene)
+
+	d.SetPartial("name")
+
+	setLightStates(connection, d.Id(), lightStates)
+
+	d.Partial(false)
+
 	return nil
 }
 
