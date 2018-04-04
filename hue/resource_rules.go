@@ -4,7 +4,6 @@ import (
 	"github.com/hashicorp/terraform/helper/schema"
 	"github.com/lawsontyler/ghue/sdk/groups"
 	"github.com/lawsontyler/ghue/sdk/common"
-	"strconv"
 	"fmt"
 	"github.com/lawsontyler/ghue/sdk/rules"
 )
@@ -22,7 +21,7 @@ func resourceRule() *schema.Resource {
 				Type: schema.TypeString,
 				Required: true,
 			},
-			"conditions": {
+			"condition": {
 				Type: schema.TypeSet,
 				Required: true,
 				Elem: &schema.Resource{
@@ -62,7 +61,7 @@ func resourceRule() *schema.Resource {
 				},
 			},
 
-			"actions": {
+			"action": {
 				Type: schema.TypeSet,
 				Required: true,
 				Elem: &schema.Resource{
@@ -104,11 +103,11 @@ func dataToConditionArray(conditions *schema.Set) []rules.Condition {
 
 	if v := conditions; v.Len() > 0 {
 		for _, v := range v.List() {
-			v := v.(schema.ResourceData)
+			v := v.(map[string]interface{})
 			conditionArray = append(conditionArray, rules.Condition{
-				Address: v.Get("address").(string),
-				Operator: v.Get("operator").(string),
-				Value: v.Get("value").(string),
+				Address: v["address"].(string),
+				Operator: v["operator"].(string),
+				Value: v["value"].(string),
 			})
 		}
 	}
@@ -121,11 +120,11 @@ func dataToActionArray(actions *schema.Set) []rules.Action {
 
 	if v := actions; v.Len() > 0 {
 		for _, v := range v.List() {
-			v := v.(schema.ResourceData)
+			v := v.(map[string]interface{})
 			actionArray = append(actionArray, rules.Action{
-				Address: v.Get("address").(string),
-				Method: v.Get("method").(string),
-				Body: v.Get("body").(map[string]interface{}),
+				Address: v["address"].(string),
+				Method: v["method"].(string),
+				Body: v["body"].(map[string]interface{}),
 			})
 		}
 	}
@@ -136,8 +135,8 @@ func dataToActionArray(actions *schema.Set) []rules.Action {
 func resourceRuleCreate(d *schema.ResourceData, m interface{}) error {
 	connection := m.(*common.Connection)
 
-	conditions := dataToConditionArray(d.Get("conditions").(*schema.Set))
-	actions := dataToActionArray(d.Get("actions").(*schema.Set))
+	conditions := dataToConditionArray(d.Get("condition").(*schema.Set))
+	actions := dataToActionArray(d.Get("action").(*schema.Set))
 
 	rule := rules.Create{
 		Name: d.Get("name").(string),
@@ -151,7 +150,7 @@ func resourceRuleCreate(d *schema.ResourceData, m interface{}) error {
 		return err
 	}
 
-	d.SetId(strconv.Itoa(result.Success.Id))
+	d.SetId(result.Success.Id)
 
 	return nil
 }

@@ -14,10 +14,12 @@ func dataSourceHueLight() *schema.Resource {
 			"name": {
 				Type: schema.TypeString,
 				ConflictsWith: []string{"light_id"},
+				Optional: true,
 			},
 			"light_id": {
 				Type: schema.TypeString,
 				ConflictsWith: []string{"name"},
+				Optional: true,
 			},
 		},
 	}

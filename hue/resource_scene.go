@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/lawsontyler/ghue/sdk/common"
 	"github.com/lawsontyler/ghue/sdk/scenes"
-	"strconv"
 )
 
 
@@ -24,11 +23,12 @@ func resourceScene() *schema.Resource {
 			},
 			"recycle": {
 				Type: schema.TypeBool,
-				Optional: false,
+				Optional: true,
 				Default: true,
 			},
 			"light_state": {
 				Type: schema.TypeSet,
+				Required: true,
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"light_id": {
@@ -39,29 +39,29 @@ func resourceScene() *schema.Resource {
 						"bri": {
 							Type:     schema.TypeString,
 							Optional: true,
-							ConflictsWith: []string{"xy", "ct"},
+							ConflictsWith: []string{"light_state.xy", "light_state.ct"},
 						},
 						"hue": {
 							Type: schema.TypeString,
 							Optional: true,
-							ConflictsWith: []string{"xy", "ct"},
+							ConflictsWith: []string{"light_state.xy", "light_state.ct"},
 						},
 						"sat": {
 							Type: schema.TypeString,
 							Optional: true,
-							ConflictsWith: []string{"xy", "ct"},
+							ConflictsWith: []string{"light_state.xy", "light_state.ct"},
 						},
 						"xy": {
 							Type: schema.TypeSet,
 							Optional: true,
-							ConflictsWith: []string{"bri", "hue", "sat", "ct"},
+							ConflictsWith: []string{"light_state.bri", "light_state.hue", "light_state.sat", "light_state.ct"},
 							Elem: &schema.Schema{Type: schema.TypeFloat},
 							MaxItems: 2,
 						},
 						"ct": {
 							Type: schema.TypeString,
 							Optional: true,
-							ConflictsWith: []string{"bri", "hue", "sat", "xy"},
+							ConflictsWith: []string{"light_state.bri", "light_state.hue", "light_state.sat", "light_state.xy"},
 						},
 						"transitiontime": {
 							Type: schema.TypeInt,
@@ -101,10 +101,9 @@ func resourceSceneCreate(d *schema.ResourceData, m interface{}) error {
 			stateValue.Sat = saturation.(string)
 		}
 
-		if xy := lightState["xy"]; xy != nil {
-			xy := xy.([]float64)
+		if xy := lightState["xy"].(*schema.Set); xy.Len() > 0 {
 			// The library expects two float64s as a string.  Neat.
-			stateValue.XY = fmt.Sprintf("%0.4fx%0.4f", xy[0], xy[1])
+			stateValue.XY = fmt.Sprintf("%0.4fx%0.4f", xy.List()[0], xy.List()[1])
 		}
 
 		stateValue.TransitionTime = "0"
@@ -137,7 +136,7 @@ func resourceSceneCreate(d *schema.ResourceData, m interface{}) error {
 
 	d.Partial(false)
 
-	d.SetId(strconv.Itoa(sceneResult.Success.Id))
+	d.SetId(sceneResult.Success.Id)
 
 	return nil
 }

@@ -26,14 +26,14 @@ func Provider() *schema.Provider {
 		},
 
 		ResourcesMap: map[string]*schema.Resource {
-			"hue_scene": resourceScene(),
-			"hue_group": resourceGroup(),
-			"hue_rule": resourceRule(),
+			"philips-hue_scene": resourceScene(),
+			"philips-hue_group": resourceGroup(),
+			"philips-hue_rule": resourceRule(),
 		},
 
 		DataSourcesMap: map[string]*schema.Resource {
-			"hue_light": dataSourceHueLight(),
-			"hue_sensor": dataSourceHueSensor(),
+			"philips-hue_light": dataSourceHueLight(),
+			"philips-hue_sensor": dataSourceHueSensor(),
 		},
 
 		ConfigureFunc: providerConfigure,

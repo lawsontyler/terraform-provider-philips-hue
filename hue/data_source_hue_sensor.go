@@ -13,11 +13,13 @@ func dataSourceHueSensor() *schema.Resource {
 		Schema: map[string]*schema.Schema {
 			"name": {
 				Type: schema.TypeString,
-				ConflictsWith: []string{"dimmer_id"},
+				ConflictsWith: []string{"sensor_id"},
+				Optional: true,
 			},
 			"sensor_id": {
 				Type: schema.TypeString,
 				ConflictsWith: []string{"name"},
+				Optional: true,
 			},
 		},
 	}
