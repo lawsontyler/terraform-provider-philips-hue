@@ -28,6 +28,7 @@ func Provider() *schema.Provider {
 		ResourcesMap: map[string]*schema.Resource {
 			"hue_scene": resourceScene(),
 			"hue_group": resourceGroup(),
+			"hue_rule": resourceRule(),
 		},
 
 		DataSourcesMap: map[string]*schema.Resource {
