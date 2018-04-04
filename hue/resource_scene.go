@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/lawsontyler/ghue/sdk/common"
 	"github.com/lawsontyler/ghue/sdk/scenes"
+	"github.com/lawsontyler/terraform-provider-philips-hue/hue/lib/constants"
 )
 
 
@@ -15,6 +16,7 @@ func resourceScene() *schema.Resource {
 		Read:   resourceSceneRead,
 		Update: resourceSceneUpdate,
 		Delete: resourceSceneDelete,
+		Exists: resourceSceneExists,
 
 		Schema: map[string]*schema.Schema{
 			"name": {
@@ -38,8 +40,7 @@ func resourceScene() *schema.Resource {
 
 						"bri": {
 							Type:     schema.TypeString,
-							Optional: true,
-							ConflictsWith: []string{"light_state.xy", "light_state.ct"},
+							Required: true,
 						},
 						"hue": {
 							Type: schema.TypeString,
@@ -54,14 +55,14 @@ func resourceScene() *schema.Resource {
 						"xy": {
 							Type: schema.TypeSet,
 							Optional: true,
-							ConflictsWith: []string{"light_state.bri", "light_state.hue", "light_state.sat", "light_state.ct"},
+							ConflictsWith: []string{"light_state.hue", "light_state.sat", "light_state.ct"},
 							Elem: &schema.Schema{Type: schema.TypeFloat},
 							MaxItems: 2,
 						},
 						"ct": {
 							Type: schema.TypeString,
 							Optional: true,
-							ConflictsWith: []string{"light_state.bri", "light_state.hue", "light_state.sat", "light_state.xy"},
+							ConflictsWith: []string{"light_state.hue", "light_state.sat", "light_state.xy"},
 						},
 						"transitiontime": {
 							Type: schema.TypeInt,
@@ -80,6 +81,8 @@ func resourceSceneCreate(d *schema.ResourceData, m interface{}) error {
 	d.Partial(true)
 
 	// Step 1: Set the light states
+	// Seizure warning is especially important here.
+
 	lightStates := d.Get("light_state").(*schema.Set).List()
 
 	var lightsInScene []string
@@ -142,6 +145,53 @@ func resourceSceneCreate(d *schema.ResourceData, m interface{}) error {
 }
 
 func resourceSceneRead(d *schema.ResourceData, m interface{}) error {
+
+	connection := m.(*common.Connection)
+
+	scene, _, err := scenes.GetScene(connection, d.Id())
+
+	if err != nil {
+		d.SetId("")
+		return err
+	}
+
+	d.Set("name", scene.Name)
+
+	d.Set("recycle", scene.Recycle)
+
+	var lightStates []map[string]interface{}
+
+	for lightId, lightState := range scene.Lightstates {
+		state := make(map[string]interface{})
+		state["light_id"] = lightId
+		state["bri"] = lightState.Bri
+		state["transitiontime"] = lightState.TransitionTime
+
+		if lightState.Hue != "" {
+			state["hue"] = lightState.Hue
+		}
+
+		if lightState.Sat != "" {
+			state["sat"] = lightState.Sat
+		}
+
+		if lightState.XY != nil {
+			state["xy"] = lightState.XY
+		}
+
+		if lightState.CT != "" {
+			state["ct"] = lightState.CT
+		}
+
+		if lightState.Effect != "" {
+			state["effect"] = lightState.Effect
+		}
+
+		lightStates = append(lightStates, state)
+	}
+
+	d.Set("light_state", lightStates)
+
 	return nil
 }
 
@@ -151,4 +201,20 @@ func resourceSceneUpdate(d *schema.ResourceData, m interface{}) error {
 
 func resourceSceneDelete(d *schema.ResourceData, m interface{}) error {
 	return nil
+}
+
+func resourceSceneExists(d *schema.ResourceData, m interface{}) (bool, error) {
+	connection := m.(*common.Connection)
+
+	_, hueErr, err := scenes.GetScene(connection, d.Id())
+
+	if err != nil {
+		if hueErr.Error.Type == int(constants.NOT_FOUND) {
+			return false, nil
+		}
+
+		return false, err
+	}
+
+	return true, err
 }

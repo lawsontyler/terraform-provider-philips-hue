@@ -6,6 +6,7 @@ import (
 	"github.com/lawsontyler/ghue/sdk/common"
 	"fmt"
 	"github.com/lawsontyler/ghue/sdk/rules"
+	"github.com/lawsontyler/terraform-provider-philips-hue/hue/lib/constants"
 )
 
 
@@ -160,7 +161,7 @@ func resourceRuleRead(d *schema.ResourceData, m interface{}) error {
 
 	group, hueErr, err := groups.GetGroup(connection, d.Id())
 
-	if err != nil && hueErr != nil && hueErr.Error.Type == 3 {
+	if err != nil && hueErr != nil && hueErr.Error.Type == int(constants.NOT_FOUND) {
 		d.SetId("")
 	}
 
