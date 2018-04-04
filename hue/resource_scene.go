@@ -247,6 +247,14 @@ func resourceSceneUpdate(d *schema.ResourceData, m interface{}) error {
 }
 
 func resourceSceneDelete(d *schema.ResourceData, m interface{}) error {
+	connection := m.(*common.Connection)
+
+	_, _, err := scenes.DeleteAPI(connection, d.Id())
+
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
