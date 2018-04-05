@@ -14,7 +14,6 @@ func resourceScene() *schema.Resource {
 		Read:   resourceSceneRead,
 		Update: resourceSceneUpdate,
 		Delete: resourceSceneDelete,
-		Exists: resourceSceneExists,
 
 		Schema: map[string]*schema.Schema{
 			"name": {
@@ -30,23 +29,29 @@ func resourceScene() *schema.Resource {
 				Type: schema.TypeSet,
 				Required: true,
 				Elem: &schema.Resource{
+
 					Schema: map[string]*schema.Schema{
 						"light_id": {
 							Type:     schema.TypeString,
 							Required: true,
 						},
 
+						"on": {
+							Type: schema.TypeBool,
+							Required: true,
+						},
+
 						"bri": {
-							Type:     schema.TypeString,
+							Type:     schema.TypeInt,
 							Required: true,
 						},
 						"hue": {
-							Type: schema.TypeString,
+							Type: schema.TypeInt,
 							Optional: true,
 							ConflictsWith: []string{"light_state.xy", "light_state.ct"},
 						},
 						"sat": {
-							Type: schema.TypeString,
+							Type: schema.TypeInt,
 							Optional: true,
 							ConflictsWith: []string{"light_state.xy", "light_state.ct"},
 						},
@@ -58,7 +63,7 @@ func resourceScene() *schema.Resource {
 							MaxItems: 2,
 						},
 						"ct": {
-							Type: schema.TypeString,
+							Type: schema.TypeInt,
 							Optional: true,
 							ConflictsWith: []string{"light_state.hue", "light_state.sat", "light_state.xy"},
 						},
@@ -132,20 +137,22 @@ func setLightStates(connection *common.Connection, sceneId string, lightStates [
 		lightState := lightState.(map[string]interface{})
 		var updateLightState scenes.LightState
 
+		updateLightState.On = lightState["on"].(bool)
+
 		if brightness := lightState["bri"]; brightness != nil {
-			updateLightState.Bri = brightness.(string)
+			updateLightState.Bri = brightness.(int)
 		}
 
 		if hue := lightState["hue"]; hue != nil {
-			updateLightState.Hue = hue.(string)
+			updateLightState.Hue = hue.(int)
 		}
 
 		if saturation := lightState["sat"]; saturation != nil {
-			updateLightState.Sat = saturation.(string)
+			updateLightState.Sat = saturation.(int)
 		}
 
 		if ct := lightState["ct"]; ct != nil {
-			updateLightState.CT = ct.(string)
+			updateLightState.CT = ct.(int)
 		}
 
 		if xy := lightState["xy"].(*schema.Set); xy.Len() > 1 {
@@ -188,28 +195,21 @@ func resourceSceneRead(d *schema.ResourceData, m interface{}) error {
 	for lightId, lightState := range scene.Lightstates {
 		state := make(map[string]interface{})
 		state["light_id"] = lightId
+		state["on"] = lightState.On
 		state["bri"] = lightState.Bri
 		state["transitiontime"] = lightState.TransitionTime
+		state["hue"] = lightState.Hue
+		state["sat"] = lightState.Sat
+		state["ct"] = lightState.CT
 
-		if lightState.Hue != "" {
-			state["hue"] = lightState.Hue
-		}
-
-		if lightState.Sat != "" {
-			state["sat"] = lightState.Sat
-		}
-
+		set := schema.Set{}
 		if lightState.XY != nil {
-			state["xy"] = lightState.XY
+			set.Add(lightState.XY[0])
+			set.Add(lightState.XY[1])
 		}
 
-		if lightState.CT != "" {
-			state["ct"] = lightState.CT
-		}
-
-		if lightState.Effect != "" {
-			state["effect"] = lightState.Effect
-		}
+		state["xy"] = &set
+		state["effect"] = lightState.Effect
 
 		lightStates = append(lightStates, state)
 	}

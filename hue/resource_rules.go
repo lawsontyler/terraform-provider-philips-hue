@@ -159,15 +159,42 @@ func resourceRuleCreate(d *schema.ResourceData, m interface{}) error {
 func resourceRuleRead(d *schema.ResourceData, m interface{}) error {
 	connection := m.(*common.Connection)
 
-	group, hueErr, err := groups.GetGroup(connection, d.Id())
+	rule, hueErr, err := rules.GetRule(connection, d.Id())
 
 	if err != nil && hueErr != nil && hueErr.Error.Type == int(constants.NOT_FOUND) {
 		d.SetId("")
 	}
 
-	d.Set("name", group.Name)
-	d.Set("lights", group.Lights)
-	d.Set("type", group.Type)
+	d.Set("name", rule.Name)
+
+	var conditions []map[string]interface{}
+
+	for _, ruleCondition := range rule.Conditions {
+		condition := make(map[string]interface{})
+
+		condition["address"] = ruleCondition.Address
+		condition["operator"] = ruleCondition.Operator
+		if ruleCondition.Value != "" {
+			condition["value"] = ruleCondition.Value
+		}
+
+		conditions = append(conditions, condition)
+	}
+
+	var actions []map[string]interface{}
+
+	for _, ruleAction := range rule.Actions {
+		action := make(map[string]interface{})
+
+		action["address"] = ruleAction.Address
+		action["method"] = ruleAction.Method
+		action["body"] = ruleAction.Body
+
+		actions = append(actions, action)
+	}
+
+	d.Set("condition", conditions)
+	d.Set("action", actions)
 
 	return nil
 }
