@@ -4,7 +4,6 @@ import (
 	"github.com/hashicorp/terraform/helper/schema"
 	"github.com/lawsontyler/ghue/sdk/groups"
 	"github.com/lawsontyler/ghue/sdk/common"
-	"strconv"
 	"github.com/lawsontyler/terraform-provider-philips-hue/hue/lib/constants"
 )
 
@@ -65,7 +64,7 @@ func resourceGroupCreate(d *schema.ResourceData, m interface{}) error {
 		return err
 	}
 
-	d.SetId(strconv.Itoa(result.Success.Id))
+	d.SetId(result.Success.Id)
 
 	return nil
 }
