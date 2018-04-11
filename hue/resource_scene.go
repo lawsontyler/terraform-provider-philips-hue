@@ -4,7 +4,8 @@ import (
 	"github.com/hashicorp/terraform/helper/schema"
 	"github.com/lawsontyler/ghue/sdk/common"
 	"github.com/lawsontyler/ghue/sdk/scenes"
-	"github.com/lawsontyler/terraform-provider-philips-hue/hue/lib/constants"
+	"fmt"
+	"strconv"
 )
 
 
@@ -36,22 +37,23 @@ func resourceScene() *schema.Resource {
 							Required: true,
 						},
 
-						"on": {
-							Type: schema.TypeBool,
-							Required: true,
+						"state": {
+							Type: schema.TypeString,
+							Optional: true,
+							ValidateFunc: validateLightOnOffState,
 						},
 
 						"bri": {
-							Type:     schema.TypeInt,
-							Required: true,
+							Type:     schema.TypeString,
+							Optional: true,
 						},
 						"hue": {
-							Type: schema.TypeInt,
+							Type: schema.TypeString,
 							Optional: true,
 							ConflictsWith: []string{"light_state.xy", "light_state.ct"},
 						},
 						"sat": {
-							Type: schema.TypeInt,
+							Type: schema.TypeString,
 							Optional: true,
 							ConflictsWith: []string{"light_state.xy", "light_state.ct"},
 						},
@@ -63,14 +65,13 @@ func resourceScene() *schema.Resource {
 							MaxItems: 2,
 						},
 						"ct": {
-							Type: schema.TypeInt,
+							Type: schema.TypeString,
 							Optional: true,
 							ConflictsWith: []string{"light_state.hue", "light_state.sat", "light_state.xy"},
 						},
 						"transitiontime": {
-							Type: schema.TypeInt,
+							Type: schema.TypeString,
 							Optional: true,
-							Default: 4,
 						},
 					},
 				},
@@ -137,30 +138,60 @@ func setLightStates(connection *common.Connection, sceneId string, lightStates [
 		lightState := lightState.(map[string]interface{})
 		var updateLightState scenes.LightState
 
-		updateLightState.On = lightState["on"].(bool)
-
-		if brightness := lightState["bri"]; brightness != nil {
-			updateLightState.Bri = brightness.(int)
-		}
-
-		if hue := lightState["hue"]; hue != nil {
-			updateLightState.Hue = hue.(int)
-		}
-
-		if saturation := lightState["sat"]; saturation != nil {
-			updateLightState.Sat = saturation.(int)
-		}
-
-		if ct := lightState["ct"]; ct != nil {
-			updateLightState.CT = ct.(int)
-		}
-
-		if xy := lightState["xy"].(*schema.Set); xy.Len() > 1 {
-			updateLightState.XY = &[2]float64{ xy.List()[0].(float64), xy.List()[1].(float64) }
-		}
-
-		if transitiontime := lightState["transitiontime"]; transitiontime != nil {
-			updateLightState.TransitionTime = transitiontime.(int)
+		for key, bodyValue := range lightState {
+			switch key {
+			case "state":
+				if bodyValue := bodyValue.(string); bodyValue != "" {
+					if bodyValue == "on" {
+						v := true
+						updateLightState.On = &v
+					} else {
+						v := false
+						updateLightState.On = &v
+					}
+				}
+				break
+			case "bri":
+				if bodyValue := bodyValue.(string); bodyValue != "" {
+					if bodyValue, _ := strconv.Atoi(bodyValue); bodyValue >= 0 {
+						updateLightState.Bri = &bodyValue
+					}
+				}
+				break
+			case "hue":
+				if bodyValue := bodyValue.(string); bodyValue != "" {
+					if bodyValue, _ := strconv.Atoi(bodyValue); bodyValue >= 0 {
+						updateLightState.Hue = &bodyValue
+					}
+				}
+				break
+			case "sat":
+				if bodyValue := bodyValue.(string); bodyValue != "" {
+					if bodyValue, _ := strconv.Atoi(bodyValue); bodyValue >= 0 {
+						updateLightState.Sat = &bodyValue
+					}
+				}
+				break
+			case "ct":
+				if bodyValue := bodyValue.(string); bodyValue != "" {
+					if bodyValue, _ := strconv.Atoi(bodyValue); bodyValue >= 0 {
+						updateLightState.CT = &bodyValue
+					}
+				}
+				break
+			case "xy":
+				if bodyValue := bodyValue.(*schema.Set); bodyValue.Len() > 1 {
+					updateLightState.XY = &[2]float64{ bodyValue.List()[0].(float64), bodyValue.List()[1].(float64) }
+				}
+				break
+			case "transitiontime":
+				if bodyValue := bodyValue.(string); bodyValue != "" {
+					if bodyValue, _ := strconv.Atoi(bodyValue); bodyValue >= 0 {
+						updateLightState.TransitionTime = &bodyValue
+					}
+				}
+				break
+			}
 		}
 
 		lightId := lightState["light_id"].(string)
@@ -195,21 +226,45 @@ func resourceSceneRead(d *schema.ResourceData, m interface{}) error {
 	for lightId, lightState := range scene.Lightstates {
 		state := make(map[string]interface{})
 		state["light_id"] = lightId
-		state["on"] = lightState.On
-		state["bri"] = lightState.Bri
-		state["transitiontime"] = lightState.TransitionTime
-		state["hue"] = lightState.Hue
-		state["sat"] = lightState.Sat
-		state["ct"] = lightState.CT
+
+		if lightState.On != nil {
+			if true == *lightState.On {
+				state["state"] = "on"
+			} else {
+				state["state"] = "off"
+			}
+		}
+
+		if lightState.Bri != nil {
+			state["bri"] = strconv.Itoa(*lightState.Bri)
+		}
+
+		if lightState.Hue != nil {
+			state["hue"] = strconv.Itoa(*lightState.Hue)
+		}
+
+		if lightState.Sat != nil {
+			state["sat"] = strconv.Itoa(*lightState.Sat)
+		}
+
+		if lightState.CT != nil {
+			state["ct"] = strconv.Itoa(*lightState.CT)
+		}
+
+		if lightState.TransitionTime != nil {
+			state["transitiontime"] = strconv.Itoa(*lightState.TransitionTime)
+		}
 
 		set := schema.Set{}
 		if lightState.XY != nil {
 			set.Add(lightState.XY[0])
 			set.Add(lightState.XY[1])
+			state["xy"] = &set
 		}
 
-		state["xy"] = &set
-		state["effect"] = lightState.Effect
+		if lightState.Effect != nil {
+			state["effect"] = *lightState.Effect
+		}
 
 		lightStates = append(lightStates, state)
 	}
@@ -258,18 +313,16 @@ func resourceSceneDelete(d *schema.ResourceData, m interface{}) error {
 	return nil
 }
 
-func resourceSceneExists(d *schema.ResourceData, m interface{}) (bool, error) {
-	connection := m.(*common.Connection)
+func validateLightOnOffState(i interface{}, s string) (_ []string, errors []error) {
+	value := i.(string)
 
-	_, hueErr, err := scenes.GetScene(connection, d.Id())
-
-	if err != nil {
-		if hueErr.Error.Type == int(constants.NOT_FOUND) {
-			return false, nil
-		}
-
-		return false, err
+	switch value {
+	case "on":
+	case "off":
+		break
+	default:
+		errors = append(errors, fmt.Errorf("%q must be either 'on' or 'off'", s))
 	}
 
-	return true, err
+	return
 }

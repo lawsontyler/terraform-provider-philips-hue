@@ -7,6 +7,7 @@ import (
 	"github.com/lawsontyler/ghue/sdk/rules"
 	"github.com/lawsontyler/terraform-provider-philips-hue/hue/lib/constants"
 	"github.com/Sirupsen/logrus"
+	"strconv"
 )
 
 
@@ -94,27 +95,25 @@ func resourceRule() *schema.Resource {
 							MaxItems: 1,
 							Elem: &schema.Resource{
 								Schema: map[string]*schema.Schema{
-									"on": {
-										Type:     schema.TypeBool,
-										Required: true,
+									"state": {
+										Type:     schema.TypeString,
+										Optional: true,
+										ValidateFunc: validateLightOnOffState,
 									},
 
 									"bri": {
-										Type:     schema.TypeInt,
+										Type:     schema.TypeString,
 										Optional: true,
-										Default: -1,
 									},
 									"hue": {
-										Type:          schema.TypeInt,
+										Type:          schema.TypeString,
 										Optional:      true,
 										ConflictsWith: []string{"action.body.xy", "action.body.ct"},
-										Default: -1,
 									},
 									"sat": {
-										Type:          schema.TypeInt,
+										Type:          schema.TypeString,
 										Optional:      true,
 										ConflictsWith: []string{"action.body.xy", "action.body.ct"},
-										Default: -1,
 									},
 									"xy": {
 										Type:          schema.TypeSet,
@@ -124,10 +123,9 @@ func resourceRule() *schema.Resource {
 										MaxItems:      2,
 									},
 									"ct": {
-										Type:          schema.TypeInt,
+										Type:          schema.TypeString,
 										Optional:      true,
 										ConflictsWith: []string{"action.body.hue", "action.body.sat", "action.body.xy"},
-										Default: -1,
 									},
 									"alert": {
 										Type: schema.TypeString,
@@ -138,34 +136,29 @@ func resourceRule() *schema.Resource {
 										Optional: true,
 									},
 									"transitiontime": {
-										Type: schema.TypeInt,
+										Type: schema.TypeString,
 										Optional: true,
 										Default: 4,
 									},
 									"bri_inc": {
-										Type: schema.TypeInt,
+										Type: schema.TypeString,
 										Optional: true,
-										Default: -1,
 									},
 									"hue_inc": {
-										Type: schema.TypeInt,
+										Type: schema.TypeString,
 										Optional: true,
-										Default: -1,
 									},
 									"sat_inc": {
-										Type: schema.TypeInt,
+										Type: schema.TypeString,
 										Optional: true,
-										Default: -1,
 									},
 									"ct_inc": {
-										Type: schema.TypeInt,
+										Type: schema.TypeString,
 										Optional: true,
-										Default: -1,
 									},
 									"xy_inc": {
-										Type: schema.TypeFloat,
+										Type: schema.TypeString,
 										Optional: true,
-										Default: -1,
 									},
 									"scene": {
 										Type: schema.TypeString,
@@ -188,8 +181,6 @@ func dataToConditionArray(conditions *schema.Set) []rules.Condition {
 	if v := conditions; v.Len() > 0 {
 		for _, v := range v.List() {
 			v := v.(map[string]interface{})
-
-
 
 			condition := rules.Condition{
 				Address: v["address"].(string),
@@ -225,23 +216,38 @@ func dataToActionArray(actions *schema.Set) []rules.Action {
 			for key, bodyValue := range v["body"].(*schema.Set).List()[0].(map[string]interface{}) {
 				logrus.Errorf("Checking %s...", key)
 				switch key {
-				case "on":
-					on := bodyValue.(bool)
-					actionBody.On = &on
+				case "state":
+					state := bodyValue.(string)
+					if state != "" {
+						if state == "on" {
+							v := true
+							actionBody.On = &v
+						} else {
+							v := false
+							actionBody.On = &v
+						}
+					}
+
 					break
 				case "bri":
-					if bodyValue := bodyValue.(int); bodyValue > 0 {
-						actionBody.Bri = &bodyValue
+					if bodyValue := bodyValue.(string); bodyValue != "" {
+						if bodyValue, _ := strconv.Atoi(bodyValue); bodyValue > 0 {
+							actionBody.Bri = &bodyValue
+						}
 					}
 					break
 				case "hue":
-					if bodyValue := bodyValue.(int); bodyValue > 0 {
-						actionBody.Hue = &bodyValue
+					if bodyValue := bodyValue.(string); bodyValue != "" {
+						if bodyValue, _ := strconv.Atoi(bodyValue); bodyValue >= 0 {
+							actionBody.Hue = &bodyValue
+						}
 					}
 					break
 				case "sat":
-					if bodyValue := bodyValue.(int); bodyValue > 0 {
-						actionBody.Sat = &bodyValue
+					if bodyValue := bodyValue.(string); bodyValue != "" {
+						if bodyValue, _ := strconv.Atoi(bodyValue); bodyValue >= 0 {
+							actionBody.Sat = &bodyValue
+						}
 					}
 					break
 				case "xy":
@@ -252,8 +258,10 @@ func dataToActionArray(actions *schema.Set) []rules.Action {
 					}
 					break
 				case "ct":
-					if bodyValue := bodyValue.(int); bodyValue > 0 {
-						actionBody.CT = &bodyValue
+					if bodyValue := bodyValue.(string); bodyValue != "" {
+						if bodyValue, _ := strconv.Atoi(bodyValue); bodyValue >= 0 {
+							actionBody.CT = &bodyValue
+						}
 					}
 					break
 				case "alert":
@@ -267,28 +275,38 @@ func dataToActionArray(actions *schema.Set) []rules.Action {
 					}
 					break
 				case "bri_inc":
-					if bodyValue := bodyValue.(int); bodyValue != -1 {
-						actionBody.BriInc = &bodyValue
+					if bodyValue := bodyValue.(string); bodyValue != "" {
+						if bodyValue, _ := strconv.Atoi(bodyValue); bodyValue >= 0 {
+							actionBody.BriInc = &bodyValue
+						}
 					}
 					break
 				case "hue_inc":
-					if bodyValue := bodyValue.(int); bodyValue != -1 {
-						actionBody.HueInc = &bodyValue
+					if bodyValue := bodyValue.(string); bodyValue != "" {
+						if bodyValue, _ := strconv.Atoi(bodyValue); bodyValue >= 0 {
+							actionBody.HueInc = &bodyValue
+						}
 					}
 					break
 				case "sat_inc":
-					if bodyValue := bodyValue.(int); bodyValue != -1 {
-						actionBody.SatInc = &bodyValue
+					if bodyValue := bodyValue.(string); bodyValue != "" {
+						if bodyValue, _ := strconv.Atoi(bodyValue); bodyValue >= 0 {
+							actionBody.SatInc = &bodyValue
+						}
 					}
 					break
 				case "ct_inc":
-					if bodyValue := bodyValue.(int); bodyValue != -1 {
-						actionBody.CTInc = &bodyValue
+					if bodyValue := bodyValue.(string); bodyValue != "" {
+						if bodyValue, _ := strconv.Atoi(bodyValue); bodyValue >= 0 {
+							actionBody.CTInc = &bodyValue
+						}
 					}
 					break
 				case "xy_inc":
-					if bodyValue := bodyValue.(float64); bodyValue != -1 {
-						actionBody.XYInc = &bodyValue
+					if bodyValue := bodyValue.(string); bodyValue != "" {
+						if bodyValue, _ := strconv.ParseFloat(bodyValue, 64); bodyValue > -1 {
+							actionBody.XYInc = &bodyValue
+						}
 					}
 					break
 				case "scene":
@@ -370,24 +388,30 @@ func resourceRuleRead(d *schema.ResourceData, m interface{}) error {
 
 		logrus.Errorf("Body: %s", ruleAction.Body)
 
-		body := map[string]interface{} {
-			"on": ruleAction.Body.On,
+		body := map[string]interface{} {}
+
+		if ruleAction.Body.On != nil {
+			if *ruleAction.Body.On == true {
+				body["state"] = "on"
+			} else {
+				body["state"] = "off"
+			}
 		}
 
 		if ruleAction.Body.Bri != nil {
-			body["bri"] = ruleAction.Body.Bri
+			body["bri"] = strconv.Itoa(*ruleAction.Body.Bri)
 		}
 		if ruleAction.Body.Hue != nil {
-			body["hue"] = ruleAction.Body.Hue
+			body["hue"] = strconv.Itoa(*ruleAction.Body.Hue)
 		}
 		if ruleAction.Body.Sat != nil {
-			body["sat"] = ruleAction.Body.Sat
+			body["sat"] = strconv.Itoa(*ruleAction.Body.Sat)
 		}
 		if ruleAction.Body.CT != nil {
-			body["ct"] = ruleAction.Body.CT
+			body["ct"] = strconv.Itoa(*ruleAction.Body.CT)
 		}
 		if ruleAction.Body.XY != nil {
-			body["xy"] = ruleAction.Body.XY
+			body["xy"] = *ruleAction.Body.XY
 		}
 		if ruleAction.Body.Alert != nil {
 			body["alert"] = ruleAction.Body.Alert
@@ -396,22 +420,22 @@ func resourceRuleRead(d *schema.ResourceData, m interface{}) error {
 			body["effect"] = ruleAction.Body.Effect
 		}
 		if ruleAction.Body.BriInc != nil {
-			body["bri_inc"] = ruleAction.Body.BriInc
+			body["bri_inc"] = strconv.Itoa(*ruleAction.Body.BriInc)
 		}
 		if ruleAction.Body.HueInc != nil {
-			body["hue_inc"] = ruleAction.Body.HueInc
+			body["hue_inc"] = strconv.Itoa(*ruleAction.Body.HueInc)
 		}
 		if ruleAction.Body.SatInc != nil {
-			body["sat_inc"] = ruleAction.Body.SatInc
+			body["sat_inc"] = strconv.Itoa(*ruleAction.Body.SatInc)
 		}
 		if ruleAction.Body.CTInc != nil {
-			body["ct_inc"] = ruleAction.Body.CTInc
+			body["ct_inc"] = strconv.Itoa(*ruleAction.Body.CTInc)
 		}
 		if ruleAction.Body.XYInc != nil {
-			body["xy_inc"] = ruleAction.Body.XYInc
+			body["xy_inc"] = strconv.FormatFloat(*ruleAction.Body.XYInc, 'f', 3, 64)
 		}
 		if ruleAction.Body.Scene != nil {
-			body["scene"] = ruleAction.Body.Scene
+			body["scene"] = *ruleAction.Body.Scene
 		}
 
 		bodySet := make([]interface{}, 0, 1)
