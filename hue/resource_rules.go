@@ -90,9 +90,8 @@ func resourceRule() *schema.Resource {
 							},
 						},
 						"body": {
-							Type: schema.TypeSet,
+							Type: schema.TypeMap,
 							Required: true,
-							MaxItems: 1,
 							Elem: &schema.Resource{
 								Schema: map[string]*schema.Schema{
 									"state": {
@@ -178,6 +177,7 @@ func resourceRule() *schema.Resource {
 func dataToConditionArray(conditions *schema.Set) []rules.Condition {
 	var conditionArray []rules.Condition
 
+	logrus.Infof("Length of conditions is: %d", conditions.Len())
 	if v := conditions; v.Len() > 0 {
 		for _, v := range v.List() {
 			v := v.(map[string]interface{})
@@ -201,9 +201,14 @@ func dataToConditionArray(conditions *schema.Set) []rules.Condition {
 func dataToActionArray(actions *schema.Set) []rules.Action {
 	var actionArray []rules.Action
 
+	logrus.Infof("Length of actions is: %d", actions.Len())
 	if v := actions; v.Len() > 0 {
 		for _, v := range v.List() {
 			v := v.(map[string]interface{})
+
+			if v["address"].(string) == "" {
+				continue
+			}
 
 			action := rules.Action{}
 			actionBody := rules.ActionBody{}
@@ -211,9 +216,9 @@ func dataToActionArray(actions *schema.Set) []rules.Action {
 			action.Address = v["address"].(string)
 			action.Method = v["method"].(string)
 
-			logrus.Errorf("Body is: %s", v["body"].(*schema.Set).List()[0].(map[string]interface{}))
+			logrus.Errorf("Body is: %s", v["body"].(map[string]interface {}))
 
-			for key, bodyValue := range v["body"].(*schema.Set).List()[0].(map[string]interface{}) {
+			for key, bodyValue := range v["body"].(map[string]interface{}) {
 				logrus.Errorf("Checking %s...", key)
 				switch key {
 				case "state":
@@ -275,36 +280,39 @@ func dataToActionArray(actions *schema.Set) []rules.Action {
 					}
 					break
 				case "bri_inc":
+					logrus.Errorf("Bri_inc is: %s", bodyValue.(string))
 					if bodyValue := bodyValue.(string); bodyValue != "" {
-						if bodyValue, _ := strconv.Atoi(bodyValue); bodyValue >= 0 {
+						logrus.Errorf("bri_inc is: %s", bodyValue)
+
+						if bodyValue, err := strconv.Atoi(bodyValue); err == nil {
 							actionBody.BriInc = &bodyValue
 						}
 					}
 					break
 				case "hue_inc":
 					if bodyValue := bodyValue.(string); bodyValue != "" {
-						if bodyValue, _ := strconv.Atoi(bodyValue); bodyValue >= 0 {
+						if bodyValue, err := strconv.Atoi(bodyValue); err == nil {
 							actionBody.HueInc = &bodyValue
 						}
 					}
 					break
 				case "sat_inc":
 					if bodyValue := bodyValue.(string); bodyValue != "" {
-						if bodyValue, _ := strconv.Atoi(bodyValue); bodyValue >= 0 {
+						if bodyValue, err := strconv.Atoi(bodyValue); err == nil  {
 							actionBody.SatInc = &bodyValue
 						}
 					}
 					break
 				case "ct_inc":
 					if bodyValue := bodyValue.(string); bodyValue != "" {
-						if bodyValue, _ := strconv.Atoi(bodyValue); bodyValue >= 0 {
+						if bodyValue, err := strconv.Atoi(bodyValue); err == nil {
 							actionBody.CTInc = &bodyValue
 						}
 					}
 					break
 				case "xy_inc":
 					if bodyValue := bodyValue.(string); bodyValue != "" {
-						if bodyValue, _ := strconv.ParseFloat(bodyValue, 64); bodyValue > -1 {
+						if bodyValue, err := strconv.ParseFloat(bodyValue, 64); err == nil {
 							actionBody.XYInc = &bodyValue
 						}
 					}
@@ -314,6 +322,12 @@ func dataToActionArray(actions *schema.Set) []rules.Action {
 						actionBody.Scene = &bodyValue
 					}
 					break
+				case "transitiontime":
+					if bodyValue := bodyValue.(string); bodyValue != "" {
+						if bodyValue, err := strconv.Atoi(bodyValue); err == nil {
+							actionBody.TransitionTime = &bodyValue
+						}
+					}
 				default:
 					continue
 				}
@@ -356,8 +370,11 @@ func resourceRuleCreate(d *schema.ResourceData, m interface{}) error {
 
 func resourceRuleRead(d *schema.ResourceData, m interface{}) error {
 	connection := m.(*common.Connection)
+	logrus.Errorf("In resourceRuleRead %s", d.Id())
 
 	rule, hueErr, err := rules.GetRule(connection, d.Id())
+
+	logrus.Infof("Rule is: %s", rule)
 
 	if err != nil && hueErr != nil && hueErr.Error.Type == int(constants.NOT_FOUND) {
 		d.SetId("")
@@ -386,7 +403,10 @@ func resourceRuleRead(d *schema.ResourceData, m interface{}) error {
 
 	for _, ruleAction := range rule.Actions {
 
-		logrus.Errorf("Body: %s", ruleAction.Body)
+
+		// if ruleAction.Body.BriInc != nil {
+			// logrus.Errorf("Body: %s", strconv.Itoa(*ruleAction.Body.BriInc))
+		// }
 
 		body := map[string]interface{} {}
 
@@ -419,9 +439,11 @@ func resourceRuleRead(d *schema.ResourceData, m interface{}) error {
 		if ruleAction.Body.Effect != nil {
 			body["effect"] = ruleAction.Body.Effect
 		}
+
 		if ruleAction.Body.BriInc != nil {
 			body["bri_inc"] = strconv.Itoa(*ruleAction.Body.BriInc)
 		}
+
 		if ruleAction.Body.HueInc != nil {
 			body["hue_inc"] = strconv.Itoa(*ruleAction.Body.HueInc)
 		}
@@ -438,14 +460,18 @@ func resourceRuleRead(d *schema.ResourceData, m interface{}) error {
 			body["scene"] = *ruleAction.Body.Scene
 		}
 
-		bodySet := make([]interface{}, 0, 1)
+		if ruleAction.Body.TransitionTime != nil {
+			body["transitiontime"] = strconv.Itoa(*ruleAction.Body.TransitionTime)
+		}
 
-		bodySet = append(bodySet, body)
+		// bodySet := make([]interface{}, 0, 1)
+
+		// bodySet = append(bodySet, body)
 
 		action := map[string]interface{}{
 			"address": ruleAction.Address,
 			"method": ruleAction.Method,
-			"body": bodySet,
+			"body": body,
 		}
 
 		actions = append(actions, action)
