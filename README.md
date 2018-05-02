@@ -105,13 +105,3 @@ resource "philips-hue_rule" "basement-dimmer-on-short" {
 }
 ```
 
-# SEIZURE WARNING
-
-In order to set and validate scenes, I need to actually set light states.  This means that the lights will change and flick from
-scene to scene as it reads and writes scenes.  As with any fast-changing lights, some people may feel discomfort when
-running `terraform plan` or `terraform apply`.
-
-I'm not a doctor - if you or anyone else in your household are prone to seizures, consult your doctor and make sure you
-follow their advice for rapidly changing or flickering lights.  **By using this plugin, you take on this risk and absolve
-the author(s) of any accountability.**
-
